@@ -36,10 +36,18 @@ runs:
       shell: bash
     - name: Meet OS specific prerequisites
       run: |
+        if('${{ runner.arch }}' -eq 'ARM64')
+        {
+          $arch = 'arm64'
+        }
+        else
+        {
+          $arch = 'amd64'
+        }
         if('${{ runner.os }}' -eq 'Linux')
         {
           printf "# Preparing environment..."
-            echo "ngrok-v3-stable-linux-amd64.zip" > ngrok_zip_name
+            echo "ngrok-v3-stable-linux-$arch.zip" > ngrok_zip_name
             whoami > ssh_user
           printf " [DONE]\n\n"
           
@@ -49,7 +57,7 @@ runs:
         elseif('${{ runner.os }}' -eq 'macOS')
         {
           printf "# Preparing environment..."
-            echo "ngrok-v3-stable-darwin-amd64.zip" > ngrok_zip_name
+            echo "ngrok-v3-stable-darwin-$arch.zip" > ngrok_zip_name
             echo "root" > ssh_user
           printf " [DONE]\n\n"
   
@@ -62,7 +70,7 @@ runs:
         elseif('${{ runner.os }}' -eq 'Windows')
         {
           printf "# Preparing environment..."
-            echo "ngrok-v3-stable-windows-amd64.zip" > ngrok_zip_name
+            echo "ngrok-v3-stable-windows-$arch.zip" > ngrok_zip_name
             echo $env:UserName > ssh_user
           printf " [DONE]\n\n"
           
