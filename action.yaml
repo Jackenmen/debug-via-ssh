@@ -36,10 +36,18 @@ runs:
       shell: bash
     - name: Meet OS specific prerequisites
       run: |
+        if('${{ runner.arch }}' -eq 'ARM64')
+        {
+          $arch = 'arm64'
+        }
+        else
+        {
+          $arch = 'amd64'
+        }
         if('${{ runner.os }}' -eq 'Linux')
         {
           printf "# Preparing environment..."
-            echo "ngrok-v3-stable-linux-amd64.zip" > ngrok_zip_name
+            echo "ngrok-v3-stable-linux-$arch.zip" > ngrok_zip_name
             whoami > ssh_user
           printf " [DONE]\n\n"
           
@@ -49,7 +57,7 @@ runs:
         elseif('${{ runner.os }}' -eq 'macOS')
         {
           printf "# Preparing environment..."
-            echo "ngrok-v3-stable-darwin-amd64.zip" > ngrok_zip_name
+            echo "ngrok-v3-stable-darwin-$arch.zip" > ngrok_zip_name
             echo "root" > ssh_user
           printf " [DONE]\n\n"
   
@@ -62,30 +70,33 @@ runs:
         elseif('${{ runner.os }}' -eq 'Windows')
         {
           printf "# Preparing environment..."
-            echo "ngrok-v3-stable-windows-amd64.zip" > ngrok_zip_name
+            echo "ngrok-v3-stable-windows-$arch.zip" > ngrok_zip_name
             echo $env:UserName > ssh_user
           printf " [DONE]\n\n"
           
-          echo "# Install SSH server"
-            curl https://dl.bitvise.com/BvSshServer-Inst.exe --output BvSshServer-Inst.exe
-            .\BvSshServer-Inst.exe -acceptEULA -defaultInstance
+          # OpenSSH Server is only already installed on windows-2025.
+          if ((Get-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0).State -ne 'Installed') {
+            echo "# Install SSH server"
+              # winget is only already installed on windows-2025
+              # issue for windows-11-arm: https://github.com/actions/runner-images/issues/14083
+              if (-not (Get-Command winget -CommandType Application -ErrorAction SilentlyContinue)) {
+                Install-Module -Name Microsoft.WinGet.Client -Repository PSGallery -Force
+                # windows-11-arm needs winget's repair command to be ran before it's available
+                # https://github.com/actions/runner-images/issues/14083
+                Repair-WinGetPackageManager -AllUsers -Latest -Force
+              }
 
-          printf "# Setting up the SSH server to allow access..."
-            $cfg = new-object -com "Bitvise.Bsscfg"
-            $cfg.settings.SetDefaults()
-            $cfg.settings.access.SetDefaults()
-            $cfg.settings.access.winGroups.Clear()
-            $cfg.settings.access.winGroups.new.SetDefaults()
-            $cfg.settings.access.winGroups.new.loginAllowed = $true
-            $cfg.settings.access.winGroups.NewCommit()
-            $cfg.settings.Save()
-          printf " [DONE]\n\n"
+              # Typically you'd use `Add-WindowsCapability` but it takes an incredibly long time
+              # on GH Actions due to having to re-apply Windows updates (measured time ~20 minutes):
+              # https://www.elevenforum.com/t/why-is-openssh-an-optional-feature-and-takes-ages-to-install-add-optional-feature.37224/
+              winget install -e --silent --accept-package-agreements --accept-source-agreements --id Microsoft.OpenSSH.Preview
+          }
 
           echo "# Add Firewall rule to allow inbound TCP connection on local port 22"
             New-NetFirewallRule -Name ngrok -DisplayName 'ngrok' -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22
 
           echo "# Start the SSH server"
-            net start BvSshServer
+            net start sshd
 
           echo "# Change the SSH user password"
             net user $env:UserName ${{ inputs.SSH_PASS }}
