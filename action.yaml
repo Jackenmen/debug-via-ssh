@@ -70,7 +70,7 @@ runs:
         {
           printf "# Preparing environment..."
             echo "ngrok-v3-stable-darwin-$arch.zip" > ngrok_zip_name
-            echo "root" > ssh_user
+            whoami > ssh_user
           printf " [DONE]\n\n"
   
           echo "# Permit login as root user"
@@ -83,6 +83,8 @@ runs:
             echo "# Add the SSH public key"
               sudo mkdir -p "/var/root/.ssh"
               echo '${{ inputs.SSH_PUBLIC_KEY }}' | sudo tee -a "/var/root/.ssh/authorized_keys"
+              mkdir -p "/Users/$(cat ssh_user)/.ssh"
+              echo '${{ inputs.SSH_PUBLIC_KEY }}' >> "/Users/$(cat ssh_user)/.ssh/authorized_keys"
           }
           if ('${{ inputs.SSH_PASS }}')
           {
