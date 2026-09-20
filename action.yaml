@@ -58,14 +58,14 @@ runs:
         {
           printf "# Preparing environment..."
             echo "ngrok-v3-stable-darwin-$arch.zip" > ngrok_zip_name
-            echo "root" > ssh_user
+            whoami > ssh_user
           printf " [DONE]\n\n"
   
           echo "# Change the SSH user password"
             echo 'PermitRootLogin yes' | sudo tee -a /etc/ssh/sshd_config >/dev/null
             sudo launchctl unload /System/Library/LaunchDaemons/ssh.plist
             sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
-            echo "${{ inputs.SSH_PASS }}`n${{ inputs.SSH_PASS }}" | sudo passwd "root"
+            echo "${{ inputs.SSH_PASS }}`n${{ inputs.SSH_PASS }}" | sudo passwd $(cat ssh_user)
         }
         elseif('${{ runner.os }}' -eq 'Windows')
         {
