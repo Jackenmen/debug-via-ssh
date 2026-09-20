@@ -130,7 +130,7 @@ runs:
           done
         printf " [DONE]\n\n"
 
-        ssh_string=$(grep -oE "tcp://(.+)" .ngrok.log | sed "s/tcp:\/\//ssh $(cat ssh_user)@/" | sed "s/:/ -p /")
+        ssh_string=$(grep -oE "tcp://(.+)" .ngrok.log | sed "s#tcp:\/\/#ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $(cat ssh_user)@#" | sed "s/:/ -p /")
         continue_path=$(eval echo ~$(cat ssh_user)/continue)
         time=${{ inputs.NGROK_TIMEOUT }}
 
