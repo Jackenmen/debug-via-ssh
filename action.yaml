@@ -24,22 +24,29 @@ runs:
   using: "composite"
   steps:
     - name: Check inputs
+      env:
+        INPUTS_SSH_PASS: ${{ inputs.SSH_PASS }}
+        INPUTS_SSH_PUBLIC_KEY: ${{ inputs.SSH_PUBLIC_KEY }}
+        INPUTS_NGROK_AUTH_TOKEN: ${{ inputs.NGROK_AUTH_TOKEN }}
       run: |
-        if [ -z "${{ inputs.SSH_PASS }}" ] && [ -z "${{ inputs.SSH_PUBLIC_KEY }}" ]
+        if [ -z "$INPUTS_SSH_PASS" ] && [ -z "$INPUTS_SSH_PUBLIC_KEY" ]
         then
           echo "SSH_PASS or SSH_PUBLIC_KEY needs to be passed in the 'with' field."
           exit 1
         fi
 
-        if [ -z "${{ inputs.NGROK_AUTH_TOKEN }}" ]
+        if [ -z "$INPUTS_NGROK_AUTH_TOKEN" ]
         then
           echo "NGROK_AUTH_TOKEN needs to be passed in the 'with' field."
           exit 1
         fi
       shell: bash
     - name: Meet OS specific prerequisites
+      env:
+        INPUTS_SSH_PASS: ${{ inputs.SSH_PASS }}
+        INPUTS_SSH_PUBLIC_KEY: ${{ inputs.SSH_PUBLIC_KEY }}
       run: |
-        if('${{ runner.arch }}' -eq 'ARM64')
+        if($env:RUNNER_ARCH -eq 'ARM64')
         {
           $arch = 'arm64'
         }
@@ -47,26 +54,26 @@ runs:
         {
           $arch = 'amd64'
         }
-        if('${{ runner.os }}' -eq 'Linux')
+        if($env:RUNNER_OS -eq 'Linux')
         {
           printf "# Preparing environment..."
             echo "ngrok-v3-stable-linux-$arch.zip" > ngrok_zip_name
             whoami > ssh_user
           printf " [DONE]\n\n"
 
-          if ('${{ inputs.SSH_PUBLIC_KEY }}')
+          if ($env:INPUTS_SSH_PUBLIC_KEY)
           {
             echo "# Add the SSH public key"
               mkdir -p "/home/$(cat ssh_user)/.ssh"
-              echo '${{ inputs.SSH_PUBLIC_KEY }}' >> "/home/$(cat ssh_user)/.ssh/authorized_keys"
+              echo $env:INPUTS_SSH_PUBLIC_KEY >> "/home/$(cat ssh_user)/.ssh/authorized_keys"
           }
-          if ('${{ inputs.SSH_PASS }}')
+          if ($env:INPUTS_SSH_PASS)
           {
             echo "# Change the SSH user password"
-              echo "${{ inputs.SSH_PASS }}`n${{ inputs.SSH_PASS }}" | sudo passwd "$(cat ssh_user)"
+              echo "$($env:INPUTS_SSH_PASS)`n$($env:INPUTS_SSH_PASS)" | sudo passwd "$(cat ssh_user)"
           }
         }
-        elseif('${{ runner.os }}' -eq 'macOS')
+        elseif($env:RUNNER_OS -eq 'macOS')
         {
           printf "# Preparing environment..."
             echo "ngrok-v3-stable-darwin-$arch.zip" > ngrok_zip_name
@@ -78,19 +85,19 @@ runs:
             sudo launchctl unload /System/Library/LaunchDaemons/ssh.plist
             sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
 
-          if ('${{ inputs.SSH_PUBLIC_KEY }}')
+          if ($env:INPUTS_SSH_PUBLIC_KEY)
           {
             echo "# Add the SSH public key"
               sudo mkdir -p "/var/root/.ssh"
-              echo '${{ inputs.SSH_PUBLIC_KEY }}' | sudo tee -a "/var/root/.ssh/authorized_keys"
+              echo $env:INPUTS_SSH_PUBLIC_KEY | sudo tee -a "/var/root/.ssh/authorized_keys"
           }
-          if ('${{ inputs.SSH_PASS }}')
+          if ($env:INPUTS_SSH_PASS)
           {
             echo "# Change the SSH user password"
-              echo "${{ inputs.SSH_PASS }}`n${{ inputs.SSH_PASS }}" | sudo passwd "root"
+              echo "$($env:INPUTS_SSH_PASS)`n$($env:INPUTS_SSH_PASS)" | sudo passwd "root"
           }
         }
-        elseif('${{ runner.os }}' -eq 'Windows')
+        elseif($env:RUNNER_OS -eq 'Windows')
         {
           printf "# Preparing environment..."
             echo "ngrok-v3-stable-windows-$arch.zip" > ngrok_zip_name
@@ -121,23 +128,25 @@ runs:
           echo "# Start the SSH server"
             net start sshd
 
-          if ('${{ inputs.SSH_PUBLIC_KEY }}')
+          if ($env:INPUTS_SSH_PUBLIC_KEY)
           {
             echo "# Add the SSH public key"
               # Authorized SSH keys for administrative users need to be added to C:\ProgramData\ssh\administrators_authorized_keys
               # See: https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_keymanagement#administrative-user
-              echo '${{ inputs.SSH_PUBLIC_KEY }}' >> "$env:ProgramData\ssh\administrators_authorized_keys"
+              echo $env:INPUTS_SSH_PUBLIC_KEY >> "$env:ProgramData\ssh\administrators_authorized_keys"
               icacls.exe ""$env:ProgramData\ssh\administrators_authorized_keys"" /inheritance:r /grant ""Administrators:F"" /grant ""SYSTEM:F""
           }
-          if ('${{ inputs.SSH_PASS }}')
+          if ($env:INPUTS_SSH_PASS)
           {
             echo "# Change the SSH user password"
-              net user $env:UserName ${{ inputs.SSH_PASS }}
+              net user $env:UserName $env:INPUTS_SSH_PASS
           }
         }
       shell: pwsh
 
     - name: Install and setup ngrok
+      env:
+        INPUTS_NGROK_AUTH_TOKEN: ${{ inputs.NGROK_AUTH_TOKEN }}
       run: |
         echo "# Install ngrok"
           curl https://bin.equinox.io/c/bNyj1mQVY4c/$(cat ngrok_zip_name) --output ngrok.zip
@@ -145,13 +154,16 @@ runs:
           chmod +x ./ngrok
 
         echo "# Set ngrok with the given authentification token"
-          ./ngrok authtoken ${{ inputs.NGROK_AUTH_TOKEN }}
+          ./ngrok authtoken "$INPUTS_NGROK_AUTH_TOKEN"
       shell: bash
 
     - name: Start ngrok
+      env:
+        INPUTS_NGROK_REGION: ${{ inputs.NGROK_REGION }}
+        INPUTS_NGROK_TIMEOUT: ${{ inputs.NGROK_TIMEOUT }}
       run: |
         printf "# Starting ngrok..."
-          ./ngrok tcp 22 --log ".ngrok.log" --region "${{ inputs.NGROK_REGION }}" &
+          ./ngrok tcp 22 --log ".ngrok.log" --region "$INPUTS_NGROK_REGION" &
         printf " [DONE]\n\n"
 
         printf "# Waiting for '.ngrok.log' file to be properly generated..."
@@ -166,10 +178,10 @@ runs:
 
         ssh_string=$(grep -oE "tcp://(.+)" .ngrok.log | sed "s#tcp:\/\/#ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $(cat ssh_user)@#" | sed "s/:/ -p /")
         continue_path=$(eval echo ~$(cat ssh_user)/continue)
-        time=${{ inputs.NGROK_TIMEOUT }}
+        time="$INPUTS_NGROK_TIMEOUT"
 
         continue_test_cmd=(test ! -e "$continue_path")
-        if [ '${{ runner.os }}' = 'macOS' ]
+        if [ "$RUNNER_OS" = 'macOS' ]
         then
           continue_test_cmd=(sudo "${continue_test_cmd[@]}")
         fi
