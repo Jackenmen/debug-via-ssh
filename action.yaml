@@ -20,6 +20,8 @@ inputs:
   NGROK_TIMEOUT:
     description: 'Timeout in seconds for ngrok session'
     default: 21500
+  SSH_COMMAND_EXTRA_ARGS:
+    description: Extra arguments to append to the printed ssh command. This will be appended to the command exactly as is.
 runs:
   using: "composite"
   steps:
@@ -186,6 +188,7 @@ runs:
       env:
         INPUTS_NGROK_REGION: ${{ inputs.NGROK_REGION }}
         INPUTS_NGROK_TIMEOUT: ${{ inputs.NGROK_TIMEOUT }}
+        INPUTS_SSH_COMMAND_EXTRA_ARGS: ${{ inputs.SSH_COMMAND_EXTRA_ARGS }}
         HOST_KEYS: ${{ steps.sshd-info.outputs.HOST_KEYS }}
       run: |
         printf "# Starting ngrok..."
@@ -218,7 +221,7 @@ runs:
           echo "#################"
           echo "# Connect to this runner using:"
           echo "#########################################"
-          echo "$ssh_string"
+          echo "$ssh_string" "$INPUTS_SSH_COMMAND_EXTRA_ARGS"
           echo "#########################################"
           echo "#"
           echo "# SSH server's host keys:"
